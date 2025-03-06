@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bean</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #87CEEB; /* Sky color */
+            overflow: hidden;
+            position: relative;
+        }
+        canvas {
+            border: 2px solid #000;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        #credit {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #000;
+            font-family: Verdana;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="flappyCanvas" width="320" height="480"></canvas>
+<div id="credit">By Black Candie</div> <!-- Credit text -->
+
+<script>
+    const canvas = document.getElementById("flappyCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Colors
+    const skyColor = "#87CEEB";
+    const groundColor = "#008000";
+    const pipeColor = "#FFA500"; // Orange pipe color
+    const pipeOutlineColor = "#000000"; // Black outline for pipes
+    const cloudColor = "#FFFFFF";
+    const cloudOutlineColor = "#000000"; // Black outline for clouds
+    const beanColor = "#FF6347";
+    const beanOutlineColor = "#000000"; // Black outline for bean
+    const groundOutlineColor = "#000000";
+
+    // Variables
+    let gap = 120; // The space between pipes
+    let bX = 10;
+    let bY = 150;
+    let gravity = 0.35;
+    let jumpStrength = -5.5;
+    let velocity = 0;
+    let score = 0;
+    let bestScore = 0;
+    let gameState = "start";
+    let velocityY = 0;
+    let floatDirection = 1;
+
+    // Cloud coordinates
+    let clouds = [];
+    for (let i = 0; i < 10; i++) {
+        clouds.push({
+            x: canvas.width + Math.random() * 300,
+            y: Math.random() * 100,
+            width: Math.random() * 30 + 20,
+            height: Math.random() * 15 + 10,
+            speed: Math.random() * 0.3 + 0.1
+        });
+    }
+
+    // Pipe coordinates
+    let pipe = [];
+    const pipeWidth = 52; // Width of the pipe
+    const pipeHeight = canvas.height - 50; // Total height of the canvas minus ground
+
+    function createPipe() {
+        const gapY = Math.floor(Math.random() * (pipeHeight - gap - 100)) + 50; // Random Y position for the gap
+        return {
+            x: canvas.width,
+            top: gapY,
+            bottom: gapY + gap
+        };
+    }
+
+    pipe[0] = createPipe();
+
+    // Key event listeners
+    document.addEventListener("keydown", moveUp);
+    document.addEventListener("keydown", startGame);
+
+    // Function to start the game
+    function startGame() {
+        if (gameState === "start") {
+            gameState = "playing";
+            bY = 150;
+            velocity = 0;
+            score = 0;
+            pipe = [createPipe()]; // Reset pipe
+        }
+    }
+
+    // Function to control the jump
+    function moveUp() {
+        if (gameState === "playing") {
+            velocity = jumpStrength;
+        }
+    }
+
+    // Function to handle the death animation
+    function handleDeath() {
+        if (bY + 30 < canvas.height - 50) {
+            velocityY += 0.5;
+            bY += velocityY;
+        } else {
+            if (score > bestScore) {
+                bestScore = score;
+            }
+            setTimeout(() => {
+                // After death, return to the start screen
+                gameState = "start";
+                velocityY = 0;
+                bY = 150;
+            }, 500);
+        }
+    }
+
+    // Function to draw pipes with outlines
+    function drawPipe(pipe) {
+        ctx.fillStyle = pipeColor;
+        ctx.strokeStyle = pipeOutlineColor;
+        ctx.lineWidth = 2;
+
+        // Draw top pipe
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top); // Top pipe
+        ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
+
+        // Draw bottom pipe
+        ctx.fillRect(pipe.x, pipe.bottom, pipeWidth, canvas.height - pipe.bottom - 50); // Bottom pipe
+        ctx.strokeRect(pipe.x, pipe.bottom, pipeWidth, canvas.height - pipe.bottom - 50);
+    }
+
+    // Function to draw clouds with outlines
+    function drawClouds() {
+        clouds.forEach(cloud => {
+            ctx.fillStyle = cloudColor;
+            ctx.strokeStyle = cloudOutlineColor;
+            ctx.lineWidth = 2;
+            
+            // Draw cloud (oval)
+            ctx.beginPath();
+            ctx.ellipse(cloud.x, cloud.y, cloud.width, cloud.height, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Move cloud
+            cloud.x -= cloud.speed;
+            if (cloud.x < -100) {
+                cloud.x = canvas.width + Math.random() * 100;
+                cloud.y = Math.random() * 100;
+                cloud.width = Math.random() * 30 + 20;
+                cloud.height = Math.random() * 15 + 10;
+            }
+        });
+    }
+
+    // Function to draw a rounded rectangle (for the bean)
+    function drawRoundedRect(x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // Function to draw the bean
+    function drawBean() {
+        ctx.fillStyle = beanColor;
+        ctx.strokeStyle = beanOutlineColor;
+        ctx.lineWidth = 2;
+
+        // Draw bean shape (rounded rectangle)
+        drawRoundedRect(bX, bY, 20, 30, 10);
+    }
+
+    // Function to draw the ground with outline
+    function drawGround() {
+        ctx.fillStyle = groundColor;
+        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        ctx.strokeStyle = groundOutlineColor;
+        ctx.strokeRect(0, canvas.height - 50, canvas.width, 50);
+    }
+
+    // Draw function
+    function draw() {
+        // Background
+        ctx.fillStyle = skyColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawClouds();
+        drawGround();
+
+        if (gameState === "start") {
+            bY += floatDirection * 0.5;
+            if (bY <= 145 || bY >= 155) {
+                floatDirection *= -1;
+            }
+
+            // Title and instructions
+            ctx.fillStyle = "#000";
+            ctx.font = "30px Verdana";
+            ctx.fillText("Flappy Bean", canvas.width / 2 - 90, canvas.height / 2 - 50);
+            ctx.font = "20px Verdana";
+            ctx.fillText("Press any key to start", canvas.width / 2 - 120, canvas.height / 2);
+            ctx.font = "18px Verdana";
+            ctx.fillText("Current Score: " + score, canvas.width / 2 - 80, canvas.height / 2 + 30);
+            ctx.fillText("Best Score: " + bestScore, canvas.width / 2 - 70, canvas.height / 2 + 50);
+
+            drawBean();
+
+        } else if (gameState === "playing") {
+            for (let i = 0; i < pipe.length; i++) {
+                drawPipe(pipe[i]);
+
+                pipe[i].x--;
+
+                if (pipe[i].x === 125) {
+                    pipe.push(createPipe());
+                }
+
+                // Collision detection
+                if (
+                    (bX >= pipe[i].x && bX <= pipe[i].x + pipeWidth &&
+                        (bY <= pipe[i].top || bY + 30 >= pipe[i].bottom)) ||
+                    bY + 30 >= canvas.height - 50
+                ) {
+                    gameState = "dead";
+                }
+
+                // Increment score when the bean passes the pipe
+                if (pipe[i].x === 5) {
+                    score++;
+                }
+            }
+
+            velocity += gravity;
+            bY += velocity;
+
+            drawGround();
+            drawBean();
+
+            ctx.fillStyle = "#000";
+            ctx.font = "20px Verdana";
+            ctx.fillText("Score: " + score, 10, canvas.height - 20);
+
+        } else if (gameState === "dead") {
+            handleDeath();
+            drawGround();
+            drawBean();
+        }
+
+        requestAnimationFrame(draw);
+    }
+
+    draw(); // Start drawing the game
+</script>
+
+</body>
+</html>
