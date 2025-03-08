@@ -3,167 +3,281 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="light dark">
     <title>Flappy Bean</title>
     <style>
         body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
             margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #87CEEB; /* Sky color */
+            overflow: hidden;
+            position: relative;
         }
-
         canvas {
-            width: 100%;
-            height: auto;
-            max-width: 480px;
+            border: 2px solid #000;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
-
-        button {
-            margin-bottom: 10px;
-            padding: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        body.light-mode {
-            background-color: white;
-            color: black;
-        }
-
-        body.dark-mode {
-            background-color: black;
-            color: white;
+        #credit {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #000;
+            font-family: Verdana;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <button id="theme-toggle">Toggle Theme</button>
-    <canvas id="gameCanvas"></canvas>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+<canvas id="flappyCanvas" width="320" height="480"></canvas>
+<div id="credit">By Black Candie</div> <!-- Credit text -->
 
-        canvas.width = 320;
-        canvas.height = 480;
+<script>
+    const canvas = document.getElementById("flappyCanvas");
+    const ctx = canvas.getContext("2d");
 
-        let bean = {
-            x: 50,
-            y: canvas.height / 2,
-            velocity: 0,
-            gravity: 0.5,
-            jump: -10
+    // Colors
+    const skyColor = "#87CEEB";
+    const groundColor = "#008000";
+    const pipeColor = "#FFA500"; // Orange pipe color
+    const pipeOutlineColor = "#000000"; // Black outline for pipes
+    const cloudColor = "#FFFFFF";
+    const cloudOutlineColor = "#000000"; // Black outline for clouds
+    const beanColor = "#FF6347";
+    const beanOutlineColor = "#000000"; // Black outline for bean
+    const groundOutlineColor = "#000000";
+
+    // Variables
+    let gap = 120; // The space between pipes
+    let bX = 10;
+    let bY = 150;
+    let gravity = 0.35;
+    let jumpStrength = -6;
+    let velocity = 0;
+    let score = 0;
+    let bestScore = 0;
+    let gameState = "start";
+    let velocityY = 0;
+    let floatDirection = 1;
+
+    // Cloud coordinates
+    let clouds = [];
+    for (let i = 0; i < 10; i++) {
+        clouds.push({
+            x: canvas.width + Math.random() * 300,
+            y: Math.random() * 100,
+            width: Math.random() * 30 + 20,
+            height: Math.random() * 15 + 10,
+            speed: Math.random() * 0.3 + 0.1
+        });
+    }
+
+    // Pipe coordinates
+    let pipe = [];
+    const pipeWidth = 52; // Width of the pipe
+    const pipeHeight = canvas.height - 50; // Total height of the canvas minus ground
+
+    function createPipe() {
+        const gapY = Math.floor(Math.random() * (pipeHeight - gap - 100)) + 50; // Random Y position for the gap
+        return {
+            x: canvas.width,
+            top: gapY,
+            bottom: gapY + gap
         };
+    }
 
-        let pipes = [];
-        let pipeWidth = 40;
-        let pipeGap = 120;
-        let pipeSpeed = 2;
-        let score = 0;
-        let gameOver = false;
+    pipe[0] = createPipe();
 
-        function resetGame() {
-            bean.y = canvas.height / 2;
-            bean.velocity = 0;
-            pipes = [];
+    // Key event listeners
+    document.addEventListener("keydown", moveUp);
+    document.addEventListener("keydown", startGame);
+
+    // Function to start the game
+    function startGame() {
+        if (gameState === "start") {
+            gameState = "playing";
+            bY = 150;
+            velocity = 0;
             score = 0;
-            gameOver = false;
+            pipe = [createPipe()]; // Reset pipe
         }
+    }
 
-        function flap() {
-            if (!gameOver) {
-                bean.velocity = bean.jump;
-            } else {
-                resetGame();
-            }
+    // Function to control the jump
+    function moveUp() {
+        if (gameState === "playing") {
+            velocity = jumpStrength;
         }
+    }
 
-        document.addEventListener("keydown", (event) => {
-            if (event.code === "Space") {
-                flap();
-            }
-        });
-
-        // Mobile support
-        document.addEventListener("touchstart", flap);
-
-        function update() {
-            if (!gameOver) {
-                bean.velocity += bean.gravity;
-                bean.y += bean.velocity;
-
-                if (bean.y > canvas.height || bean.y < 0) {
-                    gameOver = true;
-                }
-
-                if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 150) {
-                    let pipeHeight = Math.floor(Math.random() * (canvas.height - pipeGap - 20)) + 10;
-                    pipes.push({ x: canvas.width, top: pipeHeight });
-                }
-
-                pipes.forEach(pipe => {
-                    pipe.x -= pipeSpeed;
-
-                    if (pipe.x + pipeWidth < 0) {
-                        pipes.shift();
-                        score++;
-                    }
-
-                    if (
-                        bean.x < pipe.x + pipeWidth &&
-                        bean.x + 20 > pipe.x &&
-                        (bean.y < pipe.top || bean.y > pipe.top + pipeGap)
-                    ) {
-                        gameOver = true;
-                    }
-                });
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "red";
-                ctx.fillRect(bean.x, bean.y, 20, 20);
-
-                ctx.fillStyle = "green";
-                pipes.forEach(pipe => {
-                    ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
-                    ctx.fillRect(pipe.x, pipe.top + pipeGap, pipeWidth, canvas.height - pipe.top - pipeGap);
-                });
-
-                ctx.fillStyle = "black";
-                ctx.font = "20px Arial";
-                ctx.fillText("Score: " + score, 10, 25);
-            } else {
-                ctx.fillStyle = "black";
-                ctx.font = "30px Arial";
-                ctx.fillText("Game Over!", canvas.width / 4, canvas.height / 2);
-                ctx.font = "16px Arial";
-                ctx.fillText("Tap or press space to restart", canvas.width / 6, canvas.height / 2 + 30);
-            }
-
-            requestAnimationFrame(update);
-        }
-
-        update();
-
-        // Theme toggle
-        const toggleButton = document.getElementById("theme-toggle");
-        const body = document.body;
-
-        const savedTheme = localStorage.getItem("theme");
-        if (savedTheme) {
-            body.classList.add(savedTheme);
+    // Function to handle the death animation
+    function handleDeath() {
+        if (bY + 30 < canvas.height - 50) {
+            velocityY += 0.5;
+            bY += velocityY;
         } else {
-            body.classList.add(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark-mode" : "light-mode");
+            if (score > bestScore) {
+                bestScore = score;
+            }
+            setTimeout(() => {
+                // After death, return to the start screen
+                gameState = "start";
+                velocityY = 0;
+                bY = 150;
+            }, 500);
+        }
+    }
+
+    // Function to draw pipes with outlines
+    function drawPipe(pipe) {
+        ctx.fillStyle = pipeColor;
+        ctx.strokeStyle = pipeOutlineColor;
+        ctx.lineWidth = 2;
+
+        // Draw top pipe
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top); // Top pipe
+        ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
+
+        // Draw bottom pipe
+        ctx.fillRect(pipe.x, pipe.bottom, pipeWidth, canvas.height - pipe.bottom - 50); // Bottom pipe
+        ctx.strokeRect(pipe.x, pipe.bottom, pipeWidth, canvas.height - pipe.bottom - 50);
+    }
+
+    // Function to draw clouds with outlines
+    function drawClouds() {
+        clouds.forEach(cloud => {
+            ctx.fillStyle = cloudColor;
+            ctx.strokeStyle = cloudOutlineColor;
+            ctx.lineWidth = 2;
+            
+            // Draw cloud (oval)
+            ctx.beginPath();
+            ctx.ellipse(cloud.x, cloud.y, cloud.width, cloud.height, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Move cloud
+            cloud.x -= cloud.speed;
+            if (cloud.x < -100) {
+                cloud.x = canvas.width + Math.random() * 100;
+                cloud.y = Math.random() * 100;
+                cloud.width = Math.random() * 30 + 20;
+                cloud.height = Math.random() * 15 + 10;
+            }
+        });
+    }
+
+    // Function to draw a rounded rectangle (for the bean)
+    function drawRoundedRect(x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // Function to draw the bean
+    function drawBean() {
+        ctx.fillStyle = beanColor;
+        ctx.strokeStyle = beanOutlineColor;
+        ctx.lineWidth = 2;
+
+        // Draw bean shape (rounded rectangle)
+        drawRoundedRect(bX, bY, 20, 30, 10);
+    }
+
+    // Function to draw the ground with outline
+    function drawGround() {
+        ctx.fillStyle = groundColor;
+        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        ctx.strokeStyle = groundOutlineColor;
+        ctx.strokeRect(0, canvas.height - 50, canvas.width, 50);
+    }
+
+    // Draw function
+    function draw() {
+        // Background
+        ctx.fillStyle = skyColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawClouds();
+        drawGround();
+
+        if (gameState === "start") {
+            bY += floatDirection * 0.5;
+            if (bY <= 145 || bY >= 155) {
+                floatDirection *= -1;
+            }
+
+            // Title and instructions
+            ctx.fillStyle = "#000";
+            ctx.font = "30px Verdana";
+            ctx.fillText("Flappy Bean", canvas.width / 2 - 90, canvas.height / 2 - 50);
+            ctx.font = "20px Verdana";
+            ctx.fillText("Press any key to start", canvas.width / 2 - 120, canvas.height / 2);
+            ctx.font = "18px Verdana";
+            ctx.fillText("Current Score: " + score, canvas.width / 2 - 80, canvas.height / 2 + 30);
+            ctx.fillText("Best Score: " + bestScore, canvas.width / 2 - 70, canvas.height / 2 + 50);
+
+            drawBean();
+
+        } else if (gameState === "playing") {
+            for (let i = 0; i < pipe.length; i++) {
+                drawPipe(pipe[i]);
+
+                pipe[i].x--;
+
+                if (pipe[i].x === 125) {
+                    pipe.push(createPipe());
+                }
+
+                // Collision detection
+                if (
+                    (bX >= pipe[i].x && bX <= pipe[i].x + pipeWidth &&
+                        (bY <= pipe[i].top || bY + 30 >= pipe[i].bottom)) ||
+                    bY + 30 >= canvas.height - 50
+                ) {
+                    gameState = "dead";
+                }
+
+                // Increment score when the bean passes the pipe
+                if (pipe[i].x === 5) {
+                    score++;
+                }
+            }
+
+            velocity += gravity;
+            bY += velocity;
+
+            drawGround();
+            drawBean();
+
+            ctx.fillStyle = "#000";
+            ctx.font = "20px Verdana";
+            ctx.fillText("Score: " + score, 10, canvas.height - 20);
+
+        } else if (gameState === "dead") {
+            handleDeath();
+            drawGround();
+            drawBean();
         }
 
-        toggleButton.addEventListener("click", () => {
-            body.classList.toggle("dark-mode");
-            body.classList.toggle("light-mode");
+        requestAnimationFrame(draw);
+    }
 
-            localStorage.setItem("theme", body.classList.contains("dark-mode") ? "dark-mode" : "light-mode");
-        });
-    </script>
+    draw(); // Start drawing the game
+</script>
+
 </body>
 </html>
